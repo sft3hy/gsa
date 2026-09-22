@@ -1,0 +1,13 @@
+{
+  "name": "reports-map",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Minimal globe viewer with report markers and text-pack transfer tooling.",
+  "scripts": {
+    "generate:mock": "node tools/generate-mock-reports.js",
+    "serve": "node tools/serve.js",
+    "pack": "node tools/pack-project.js",
+    "pack:consolidated": "node tools/bundle-consolidated.js",
+    "rebuild": "node tools/rebuild-project.js"
+  }
+}

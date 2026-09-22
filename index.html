@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Report Map</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+    <script src="./assets/vendor/mgrs.min.js"></script>
+    <script type="module" src="./src/main.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <section class="globe-panel">
+        <div class="panel-header">
+          <div>
+            <h1>Report Map</h1>
+          </div>
+          <div class="status-row">
+            <span class="status-pill muted" id="report-count">0 reports</span>
+          </div>
+        </div>
+        <div class="panel-toolbar">
+          <div class="toolbar-start">
+            <section class="import-drawer">
+              <button id="import-toggle" class="import-toggle" type="button" aria-expanded="false" aria-controls="import-body">
+                Import Reports
+              </button>
+              <div id="import-body" class="drawer-body" hidden>
+                <p class="section-copy">
+                  Paste a JSON array of reports. Locations can be `lat/lon`, `location:
+                  "lat, lon"`, `mgrs`, or a custom `position`.
+                </p>
+                <textarea id="report-input" spellcheck="false" placeholder="Paste a JSON array, or load the generated dataset."></textarea>
+                <div class="button-row">
+                  <button id="load-sample" type="button">Load generated JSON</button>
+                  <button id="import-reports" type="button">Import JSON</button>
+                </div>
+                <pre id="import-feedback" class="feedback"></pre>
+              </div>
+            </section>
+          </div>
+          <div class="toolbar-end">
+            <section class="intensity-legend" aria-label="Conflict intensity legend">
+              <span class="control-label">Intensity</span>
+              <div class="legend-row">
+                <span class="legend-item"><span class="legend-swatch low"></span>Low</span>
+                <span class="legend-item"><span class="legend-swatch elevated"></span>Elevated</span>
+                <span class="legend-item"><span class="legend-swatch high"></span>High</span>
+                <span class="legend-item"><span class="legend-swatch critical"></span>Critical</span>
+              </div>
+            </section>
+            <div class="layer-picker">
+              <span class="control-label">Base</span>
+              <div class="layer-switcher" role="group" aria-label="Base layer">
+                <button class="layer-option active" type="button" data-layer="current" aria-pressed="true">Base</button>
+                <button class="layer-option" type="button" data-layer="blueMarble" aria-pressed="false">Blue Marble</button>
+                <button class="layer-option" type="button" data-layer="openStreetMap" aria-pressed="false">OpenStreetMap</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="canvas-frame">
+          <canvas id="globe" width="960" height="960" aria-label="Interactive globe"></canvas>
+          <section class="map-overlay-card" hidden>
+            <div class="section-title">
+              <h2>Selected Report</h2>
+            </div>
+            <div id="report-card" class="report-card"></div>
+          </section>
+        </div>
+      </section>
+      <aside class="control-panel" hidden>
+        <section class="card-section">
+          <div class="section-title">
+            <h2>Selected Report</h2>
+          </div>
+          <div class="report-card empty"></div>
+        </section>
+      </aside>
+    </div>
+  </body>
+</html>
