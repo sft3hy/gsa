@@ -13,5 +13,8 @@
     "pack": "node tools/pack-project.js",
     "pack:consolidated": "node tools/bundle-consolidated.js",
     "rebuild": "node tools/rebuild-project.js"
+  },
+  "devDependencies": {
+    "wrangler": "^4.136.1"
   }
 }
