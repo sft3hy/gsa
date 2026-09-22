@@ -6,19 +6,31 @@ const rootDir = path.resolve(__dirname, "..");
 const host = "127.0.0.1";
 const port = Number(process.env.PORT || 4173);
 
+const serveDist = process.argv.includes("--dist") || process.env.SERVE_DIST === "true";
+const baseDir = serveDist && fs.existsSync(path.join(rootDir, "dist"))
+  ? path.join(rootDir, "dist")
+  : rootDir;
+
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".js": "application/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
-  ".txt": "text/plain; charset=utf-8"
+  ".geojson": "application/geo+json; charset=utf-8",
+  ".txt": "text/plain; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".svg": "image/svg+xml",
+  ".ico": "image/x-icon"
 };
 
 function resolveTarget(urlPath) {
   const cleanPath = urlPath === "/" ? "/index.html" : urlPath;
-  const target = path.normalize(path.join(rootDir, cleanPath));
+  const target = path.normalize(path.join(baseDir, cleanPath));
 
-  if (target.indexOf(rootDir) !== 0) {
+  if (target.indexOf(baseDir) !== 0) {
     return null;
   }
 

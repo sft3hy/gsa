@@ -1,101 +1,102 @@
-# Reports Globe
+# Global News Monitor & Real-Time 3D News Globe
 
-Minimal static globe app with:
+An interactive 3D orthographic globe visualizing live, real-time international news headlines and geopolitical events with zero dummy mock data. Built with an automated news aggregation pipeline from completely free public APIs, deployed via **GitHub Actions for GitHub Pages** (building from `dist/`) and backed by a **Cloudflare Proxy Backend** (Cloudflare Worker edge API and Node.js proxy server).
 
-- Night-mode orthographic globe
-- Country boundary markings
-- Drag rotation
-- Clickable report dots with side-panel cards
-- Report import for lat/lon strings, objects, arrays, and MGRS
-- Text-only project export and rebuild tooling
+---
 
-## Run locally
+## Features
+
+- **100% Real-Time News Feeds**: Replaces all dummy/synthetic mock data with live international news from public, free feeds.
+- **Global News Sources**:
+  - **BBC World News**: International top stories and reporting.
+  - **Al Jazeera English**: Breaking alerts, Middle East, Asia, and global coverage.
+  - **UN News**: Global peace, security, climate, and humanitarian dispatches.
+  - **USGS Real-Time Earthquakes**: Live global seismic alerts with exact coordinates and magnitude.
+  - **Deutsche Welle (DW) English**: European and world affairs.
+  - **NPR World News**: In-depth global journalism.
+  - **GDELT Project DOC 2.0**: Global event database tracking international articles and publications.
+- **Interactive 3D News Globe**: Orthographic projection with drag rotation, zoom, country boundaries, and category filter chips (Conflict, Disasters, Diplomacy, Security, Tech, Economy).
+- **Direct Story Links**: Click any headline marker to inspect details and jump directly to the verified news article with "Read Story on [Source] ↗".
+- **Severity & Intensity Scoring**: Auto-classifies event severity (Low, Elevated, High, Critical) based on incident type and impact keywords.
+- **Auto-Refreshing**: Periodically re-fetches breaking news every 5 minutes with a live indicator and manual refresh button.
+
+---
+
+## Deployment Setup
+
+### 1. Frontend: GitHub Pages via GitHub Actions
+
+The frontend builds production assets into `dist/` and is deployed using official GitHub Actions (`.github/workflows/deploy-frontend.yml`).
+
+#### Required Repository Setting
+1. Open your repository on GitHub: [`https://github.com/sft3hy/gsa`](https://github.com/sft3hy/gsa).
+2. Go to **Settings** &rarr; **Pages**.
+3. Under **Build and deployment** &rarr; **Source**, select **GitHub Actions** (instead of "Deploy from a branch").
+4. Every push to `main` will automatically build `dist/` and deploy to `https://sft3hy.github.io/gsa/`.
+
+---
+
+### 2. Backend: Cloudflare Proxy Backend
+
+The backend aggregates and geocodes public news feeds, caches results with Cloudflare edge caching, and exposes CORS-enabled `/api/news`, `/api/health`, and `/api/sources` endpoints.
+
+#### Option A: Cloudflare Worker (Zero Servers Needed - Recommended)
+The Worker runs serverless directly on Cloudflare's global edge network:
+- Configured via `wrangler.toml` and `backend/worker.js`.
+- Automated deployment via `.github/workflows/deploy-backend.yml`.
+
+**Account Configuration Required:**
+1. In the [Cloudflare Dashboard](https://dash.cloudflare.com/):
+   - Go to **My Profile** &rarr; **API Tokens** &rarr; **Create Token**.
+   - Select the template **Edit Cloudflare Workers**.
+   - Copy the generated API token.
+   - Copy your **Account ID** (found on the right sidebar of any domain overview or Workers page).
+2. In your GitHub repository:
+   - Go to **Settings** &rarr; **Secrets and variables** &rarr; **Actions** &rarr; **New repository secret**.
+   - Add:
+     - `CLOUDFLARE_API_TOKEN`: Your Cloudflare API token.
+     - `CLOUDFLARE_ACCOUNT_ID`: Your Cloudflare Account ID.
+3. Push to `main` or trigger `.github/workflows/deploy-backend.yml` manually via GitHub Actions to deploy!
+
+#### Option B: Standalone Node.js Server behind Cloudflare Tunnel / Orange-Cloud Proxy
+If you prefer hosting the backend on a VM, container, or home server:
+```bash
+# Start backend server locally on port 8787
+npm run backend
+```
+- Expose via **Cloudflare Tunnel (`cloudflared`)**:
+  - Review template configuration in `backend/cloudflared.yml`.
+  - Run: `cloudflared tunnel --config backend/cloudflared.yml run`
+- Or point a proxied (Orange-cloud) DNS record to your server origin.
+
+---
+
+## Local Development
 
 ```bash
+# 1. Install dependencies (if any)
+npm install
+
+# 2. Build the production bundle into dist/ (pre-fetches fresh live headlines)
+npm run build
+
+# 3. Serve the built dist/ locally
 npm run serve
+
+# 4. Or run the local backend news API server
+npm run backend
 ```
 
-Open `http://127.0.0.1:4173`.
+Open `http://127.0.0.1:4173` to explore the globe.
 
-Notes:
+---
 
-- The app is static and build-free.
-- Country boundaries are bundled locally.
-- The MGRS helper is vendored locally, so the rebuilt app works offline.
+## Available npm Scripts
 
-## Report format
-
-The importer accepts a JSON array. Examples:
-
-```json
-[
-  {
-    "id": "rpt-001",
-    "title": "Surface contact",
-    "summary": "Observation near the port.",
-    "location": "33.7405, -118.2760",
-    "category": "MARITIME",
-    "timestamp": "2026-04-27T06:20:00Z"
-  },
-  {
-    "id": "rpt-002",
-    "title": "Grid reference",
-    "summary": "MGRS-derived position.",
-    "mgrs": "11SLT 94056 05668",
-    "category": "GROUND"
-  }
-]
-```
-
-Supported location shapes:
-
-- `"location": "lat, lon"`
-- `"location": { "lat": 34.0, "lon": -118.2 }`
-- `"lat": 34.0, "lon": -118.2`
-- `"coordinates": [-118.2, 34.0]`
-- `"position": { "type": "mgrs", "value": "11SLT 94056 05668" }`
-- `"mgrs": "11SLT 94056 05668"`
-
-## Pack into text files
-
-```bash
-npm run pack
-```
-
-This creates `transfer/` with:
-
-- `bundle.part-*.txt` chunk files
-- `manifest.json.txt`
-- `rebuild-project.txt`
-
-The packer only includes the files needed to run and re-pack the app, and it keeps the
-output to 10 files or fewer so it can be transferred in a single pass.
-
-## Build the consolidated bundle
-
-```bash
-npm run pack:consolidated
-```
-
-This wipes and rebuilds `consolidated-bundle/` with:
-
-- one combined code bundle text file
-- only the runtime image assets as image files
-- `manifest.json.txt`
-- `rebuild-project.txt`
-
-Everything is flattened into a single folder and stays well under the 10-file limit.
-
-## Rebuild from transferred text files
-
-From a directory containing the transferred `transfer/` files:
-
-```bash
-node rebuild-project.txt
-```
-
-Optional output directory:
-
-```bash
-node rebuild-project.txt ./restored-project
-```
+- `npm run build`: Cleans `dist/`, fetches live real-time news snapshot into `dist/news-feed.json`, bundles assets and country boundaries.
+- `npm run serve`: Serves `dist/` (or root) locally at `http://127.0.0.1:4173`.
+- `npm run backend`: Runs the live news aggregation HTTP server locally at `http://localhost:8787`.
+- `npm run fetch:news`: Fetches a fresh news snapshot from public feeds and updates `news-feed.json`.
+- `npm run pack`: Packs project into text chunks for transfer.
+- `npm run pack:consolidated`: Builds consolidated single-file code bundle.
+- `npm run rebuild`: Rebuilds project from transferred text packs.

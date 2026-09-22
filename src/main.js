@@ -1,5 +1,6 @@
 const COUNTRY_DATA_URL = "./data-countries-110m.geojson";
-const MOCK_REPORTS_URL = "./mock-reports.json";
+const PRIMARY_NEWS_API_URL = window.NEWS_BACKEND_URL || (new URLSearchParams(window.location.search).get("api")) || "/api/news";
+const FALLBACK_NEWS_FEED_URL = "./news-feed.json";
 const INTENSITY_STYLES = {
   low: {
     label: "Low",
@@ -57,6 +58,14 @@ const importToggleEl = document.getElementById("import-toggle");
 const importBodyEl = document.getElementById("import-body");
 const layerButtons = Array.from(document.querySelectorAll(".layer-option"));
 const sampleButton = document.getElementById("load-sample");
+const refreshNewsBtn = document.getElementById("refresh-news-btn");
+const closeCardBtn = document.getElementById("close-card-btn");
+const feedStatusEl = document.getElementById("feed-status");
+const categoryChips = Array.from(document.querySelectorAll(".filter-chip"));
+const loadLiveApiBtn = document.getElementById("load-live-api");
+
+let allLiveReports = [];
+let currentCategory = "ALL";
 
 const locatorResolvers = new Map();
 const textureLayers = new Map();
@@ -654,12 +663,18 @@ function renderReportCard(report) {
   }
 
   const meta = [
-    report.category || "UNSPECIFIED",
-    report.source || "Unknown source",
-    report.timestamp ? new Date(report.timestamp).toLocaleString() : "No timestamp"
+    report.category || "WORLD",
+    report.source || "Global News",
+    report.timestamp ? new Date(report.timestamp).toLocaleString() : "Live"
   ];
   const style = getReportStyle(report);
   const countryLine = [report.country, report.region].filter(Boolean).join(" · ");
+
+  const articleLinkHtml = report.url ? `
+    <a href="${escapeHtml(report.url)}" target="_blank" rel="noopener noreferrer" class="article-link-btn">
+      🔗 Read Story on ${escapeHtml(report.source || "Source")} ↗
+    </a>
+  ` : "";
 
   reportCardShellEl.hidden = false;
   reportCardEl.className = "report-card";
@@ -673,26 +688,23 @@ function renderReportCard(report) {
     <p>${escapeHtml(report.summary || "No summary provided.")}</p>
     <dl class="report-meta">
       <div>
-        <dt>Country</dt>
-        <dd>${escapeHtml(countryLine || "Unspecified")}</dd>
+        <dt>Location</dt>
+        <dd>${escapeHtml(countryLine || "Global")}</dd>
       </div>
       <div>
-        <dt>Intensity Score</dt>
-        <dd>${escapeHtml(String(report.intensityScore ?? "n/a"))}</dd>
+        <dt>Source</dt>
+        <dd>${escapeHtml(report.source || "International wire")}</dd>
       </div>
       <div>
-        <dt>Report ID</dt>
-        <dd>${escapeHtml(report.id || "n/a")}</dd>
+        <dt>Category</dt>
+        <dd>${escapeHtml(report.category || "WORLD")}</dd>
       </div>
       <div>
         <dt>Coordinates</dt>
         <dd>${escapeHtml(formatLocation(report))}</dd>
       </div>
-      <div>
-        <dt>Original</dt>
-        <dd>${escapeHtml(report.rawLocation || "lat/lon")}</dd>
-      </div>
     </dl>
+    ${articleLinkHtml}
   `;
 }
 
@@ -1038,32 +1050,67 @@ async function loadCountries() {
   drawScene();
 }
 
-async function fetchGeneratedReports() {
-  const response = await fetch(MOCK_REPORTS_URL, { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error(`Unable to load ${MOCK_REPORTS_URL} (${response.status}).`);
+async function fetchLiveNewsReports() {
+  // 1. Try configured/proxied backend API
+  try {
+    const response = await fetch(PRIMARY_NEWS_API_URL, { cache: "no-store" });
+    if (response.ok) {
+      const data = await response.json();
+      const reports = Array.isArray(data) ? data : data.reports;
+      if (Array.isArray(reports) && reports.length > 0) {
+        if (feedStatusEl) feedStatusEl.textContent = "LIVE API";
+        return reports;
+      }
+    }
+  } catch (err) {
+    console.warn("Primary live news API unreachable, falling back to static snapshot:", err.message);
   }
 
-  const data = await response.json();
-  if (!Array.isArray(data)) {
-    throw new Error("Generated report data must be a JSON array.");
+  // 2. Try pre-baked news-feed.json snapshot
+  try {
+    const response = await fetch(FALLBACK_NEWS_FEED_URL, { cache: "no-store" });
+    if (response.ok) {
+      const data = await response.json();
+      const reports = Array.isArray(data) ? data : data.reports;
+      if (Array.isArray(reports) && reports.length > 0) {
+        if (feedStatusEl) feedStatusEl.textContent = "LIVE CACHED";
+        return reports;
+      }
+    }
+  } catch (err) {
+    console.warn("Fallback news snapshot unreachable:", err.message);
   }
 
-  return data;
+  throw new Error("Unable to connect to live news API or fallback snapshot.");
 }
 
-async function loadGeneratedReports() {
+function applyCategoryFilter() {
+  let filtered = allLiveReports;
+  if (currentCategory && currentCategory !== "ALL") {
+    filtered = allLiveReports.filter(r => (r.category || "").toUpperCase() === currentCategory);
+  }
+  reportInputEl.value = JSON.stringify(filtered, null, 2);
+  ingestReports(filtered);
+}
+
+async function loadLiveNews() {
+  if (reportCountEl) reportCountEl.textContent = "Fetching news...";
+  if (refreshNewsBtn) refreshNewsBtn.classList.add("spinning");
+
   try {
-    const reports = await fetchGeneratedReports();
-    reportInputEl.value = JSON.stringify(reports, null, 2);
-    ingestReports(reports);
+    const reports = await fetchLiveNewsReports();
+    allLiveReports = reports;
+    applyCategoryFilter();
+    importFeedbackEl.textContent = `Connected! ${reports.length} real-time global news headlines active.`;
   } catch (error) {
     reportInputEl.value = "[]";
     reportMarkers = [];
     updateReportCount();
     drawScene();
     importFeedbackEl.textContent = error.message;
-    console.error("Mock report data unavailable", error);
+    console.error("Live news feed unavailable:", error);
+  } finally {
+    if (refreshNewsBtn) refreshNewsBtn.classList.remove("spinning");
   }
 }
 
@@ -1167,8 +1214,37 @@ layerButtons.forEach((button) => {
   });
 });
 
-sampleButton.addEventListener("click", () => {
-  loadGeneratedReports();
+if (sampleButton) {
+  sampleButton.addEventListener("click", () => {
+    loadLiveNews();
+  });
+}
+
+if (loadLiveApiBtn) {
+  loadLiveApiBtn.addEventListener("click", () => {
+    loadLiveNews();
+  });
+}
+
+if (refreshNewsBtn) {
+  refreshNewsBtn.addEventListener("click", () => {
+    loadLiveNews();
+  });
+}
+
+if (closeCardBtn) {
+  closeCardBtn.addEventListener("click", () => {
+    renderReportCard(null);
+  });
+}
+
+categoryChips.forEach(chip => {
+  chip.addEventListener("click", () => {
+    categoryChips.forEach(c => c.classList.remove("active"));
+    chip.classList.add("active");
+    currentCategory = chip.dataset.category || "ALL";
+    applyCategoryFilter();
+  });
 });
 
 importButton.addEventListener("click", () => {
@@ -1177,19 +1253,27 @@ importButton.addEventListener("click", () => {
     if (!Array.isArray(parsed)) {
       throw new Error("Top-level value must be an array.");
     }
+    allLiveReports = parsed;
     ingestReports(parsed);
   } catch (error) {
     importFeedbackEl.textContent = error.message;
   }
 });
 
+// Auto-refresh news feeds every 5 minutes
+setInterval(() => {
+  loadLiveNews();
+}, 5 * 60 * 1000);
+
 reportInputEl.value = "[]";
 renderReportCard(null);
 initializeBaseLayers();
 drawScene();
 loadCountries();
-loadGeneratedReports();
+loadLiveNews();
 
 window.ReportsGlobe = {
-  registerLocatorResolver
+  registerLocatorResolver,
+  loadLiveNews,
+  getReports: () => allLiveReports
 };
